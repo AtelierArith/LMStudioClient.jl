@@ -6,6 +6,14 @@ struct Client
     timeout::Int
 end
 
+function _normalize_base_url(base_url::AbstractString)
+    normalized = String(base_url)
+    while endswith(normalized, "/") && !endswith(normalized, "://")
+        normalized = chop(normalized)
+    end
+    return normalized
+end
+
 function _normalize_timeout_seconds(timeout::Real)
     isfinite(timeout) || throw(ArgumentError("timeout must be finite"))
     timeout >= 0 || throw(ArgumentError("timeout must be non-negative"))
@@ -13,7 +21,7 @@ function _normalize_timeout_seconds(timeout::Real)
 end
 
 Client(; base_url::String="http://127.0.0.1:1234", api_token::Union{Nothing,String}=nothing, timeout::Real=30.0) =
-    Client(base_url, api_token, _normalize_timeout_seconds(timeout))
+    Client(_normalize_base_url(base_url), api_token, _normalize_timeout_seconds(timeout))
 
 mutable struct ChatSession
     model::String

@@ -7,6 +7,9 @@ using Dates
     @test client.timeout == 30
     @test client.timeout isa Int
 
+    normalized_client = Client(base_url="http://127.0.0.1:1234/")
+    @test normalized_client.base_url == "http://127.0.0.1:1234"
+
     fractional_timeout_client = Client(timeout=1.2)
     @test fractional_timeout_client.timeout == 2
     @test fractional_timeout_client.timeout isa Int

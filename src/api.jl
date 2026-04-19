@@ -17,6 +17,8 @@ const _LOAD_STATUS_MAP = Dict(
     "loaded" => :loaded,
 )
 
+const _SESSION_STREAM_BUFFER_SIZE = 256
+
 function _parse_datetime(value)
     if value === nothing
         return nothing
@@ -380,42 +382,12 @@ function stream_chat(client::Client, session::ChatSession, input; kwargs...)
         system_prompt=session.system_prompt,
         kwargs...,
     )
-    buffered_events = LMStudioEvent[]
-    done = Ref(false)
-    failure = Ref{Any}(nothing)
-    signal = Channel{Nothing}(1)
-
-    @async begin
-        try
-            for event in upstream
-                if event isa ChatEndEvent
-                    session.previous_response_id = event.result.response_id
-                end
-                push!(buffered_events, event)
-                !isready(signal) && put!(signal, nothing)
+    return _error_aware_channel(LMStudioEvent, _SESSION_STREAM_BUFFER_SIZE) do channel
+        for event in upstream
+            if event isa ChatEndEvent
+                session.previous_response_id = event.result.response_id
             end
-        catch err
-            failure[] = err
-        finally
-            done[] = true
-            !isready(signal) && put!(signal, nothing)
-        end
-    end
-
-    return _error_aware_channel(LMStudioEvent, 32) do channel
-        index = 1
-        while true
-            while index <= length(buffered_events)
-                put!(channel, buffered_events[index])
-                index += 1
-            end
-
-            done[] && break
-            take!(signal)
-        end
-
-        if !isnothing(failure[])
-            throw(failure[])
+            put!(channel, event)
         end
     end
 end

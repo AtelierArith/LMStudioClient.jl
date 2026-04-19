@@ -228,6 +228,47 @@ end
     @test any(event -> event isa ChatEndEvent, rest)
 end
 
+@testset "stream_chat session overload applies backpressure instead of buffering unbounded events" begin
+    total_chunks = 2000
+    produced = Ref(0)
+
+    fake_stream_transport = function (; method, path, body, stream, client)
+        @test method == "POST"
+        @test path == "/api/v1/chat"
+        @test stream == true
+        @test body["stream"] == true
+        return Channel{String}(0) do channel
+            put!(channel, "event: chat.start")
+            put!(channel, "data: {\"type\":\"chat.start\",\"model_instance_id\":\"google/gemma-4-e2b\"}")
+            put!(channel, "")
+
+            for idx in 1:total_chunks
+                produced[] += 1
+                put!(channel, "event: message.delta")
+                put!(channel, "data: {\"type\":\"message.delta\",\"content\":\"chunk $(idx)\"}")
+                put!(channel, "")
+            end
+
+            put!(channel, "event: chat.end")
+            put!(channel, "data: {\"type\":\"chat.end\",\"result\":{\"model_instance_id\":\"google/gemma-4-e2b\",\"output\":[{\"type\":\"message\",\"content\":\"Blue\"}],\"stats\":{\"input_tokens\":5,\"total_output_tokens\":$(total_chunks),\"reasoning_output_tokens\":0,\"tokens_per_second\":15.0,\"time_to_first_token_seconds\":0.2},\"response_id\":\"resp_backpressure\"}}")
+            put!(channel, "")
+        end
+    end
+
+    client = Client()
+    session = ChatSession("google/gemma-4-e2b")
+    events = stream_chat(client, session, "Keep going."; _stream_transport=fake_stream_transport)
+
+    first_event = take!(events)
+    @test first_event isa ChatStartEvent
+
+    reached_end_without_consumer = wait_until(() -> session.previous_response_id == "resp_backpressure"; timeout=0.5)
+    @test reached_end_without_consumer == false
+    @test produced[] < total_chunks
+
+    close(events)
+end
+
 @testset "stream_chat surfaces producer API errors directly" begin
     fake_stream_transport = function (; method, path, body, stream, client)
         @test method == "POST"
