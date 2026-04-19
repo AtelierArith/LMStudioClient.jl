@@ -23,7 +23,7 @@ using Dates
     @test fieldtype(DownloadJob, 7) == Union{Nothing,Float64}
     @test fieldtype(DownloadJob, 8) == Union{Nothing,DateTime}
 
-    loaded = LoadedModel(:loaded, "model_inst_1", :ready, 12.5, Dict("foo" => "bar"))
+    loaded = LoadModelResult(:loaded, "model_inst_1", :ready, 12.5, Dict("foo" => "bar"))
     @test loaded.type == :loaded
     @test loaded.instance_id == "model_inst_1"
     @test loaded.status == :ready
@@ -62,7 +62,7 @@ using Dates
 
     @test isabstracttype(LMStudioClient.ChatOutputItem)
     @test isabstracttype(LMStudioEvent)
-    @test isconcretetype(LoadedModel)
+    @test isconcretetype(LoadModelResult)
     @test isconcretetype(ChatStats)
     @test isconcretetype(ChatResponse)
 end
