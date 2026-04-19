@@ -4,8 +4,12 @@ Thin Julia client for LM Studio's native REST API.
 
 It supports:
 
+- model listing
+- loaded model listing
 - model download
 - model load
+- model unload
+- server status
 - non-streaming chat
 - stateful chat with `ChatSession`
 - streaming chat via `stream_chat`
@@ -49,6 +53,11 @@ Pkg.instantiate()
 using LMStudioClient
 
 client = Client()
+
+println(server_status(client).reachable)
+
+models = list_models(client; domain=:llm)
+println(first(models).key)
 
 # Replace this with a model identifier that exists in your LM Studio setup.
 job = download_model(client, "google/gemma-4-e2b")

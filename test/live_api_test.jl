@@ -11,6 +11,15 @@ else
         )
 
         model = get(ENV, "LMSTUDIO_TEST_MODEL", "google/gemma-4-e2b")
+        model_name = model
+
+        status = server_status(client)
+        @test status.reachable == true
+        @test status.authenticated in (true, nothing)
+
+        models = list_models(client)
+        @test !isempty(models)
+        @test any(model -> model.key == model_name || startswith(model.key, model_name), models)
 
         job = download_model(client, model)
         if isnothing(job.job_id)
@@ -27,6 +36,9 @@ else
         loaded = load_model(client, model; context_length=8192)
         @test loaded.status == :loaded
         @test loaded.instance_id != ""
+
+        loaded_models = list_loaded_models(client)
+        @test any(item -> item.model_key == model || startswith(item.instance_id, model), loaded_models)
 
         response = chat(client; model=model, input="Reply with the single word BLUE.")
         response_text = join([item.content for item in response.output if item isa MessageOutput], " ")

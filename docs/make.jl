@@ -12,6 +12,7 @@ makedocs(
     pages = [
         "Home" => "index.md",
         "Getting Started" => "getting-started.md",
+        "Model Management" => "model-management.md",
         "Streaming" => "streaming.md",
     ],
 )

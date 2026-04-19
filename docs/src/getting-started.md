@@ -14,6 +14,20 @@ If your LM Studio server is exposed on another host or needs authentication, con
 
 Before you use the examples below, confirm the exact model identifier in LM Studio itself. If you use the `lms` CLI, `lms ls` shows installed models and `lms ps` shows loaded ones.
 
+## Check Server Reachability And Discover Models
+
+```julia
+using LMStudioClient
+
+client = Client()
+
+status = server_status(client)
+println(status.reachable)
+
+models = list_models(client; domain=:llm)
+println(first(models).key)
+```
+
 ## Download And Load A Model
 
 Replace `google/gemma-4-e2b` with any model that is available in your local LM Studio install.

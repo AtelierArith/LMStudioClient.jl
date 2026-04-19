@@ -5,7 +5,9 @@
 It is aimed at local-model workflows such as:
 
 - downloading models
-- loading models
+- listing downloaded models
+- listing loaded models
+- loading and unloading models
 - one-shot chat
 - stateful chat with `ChatSession`
 - streaming chat with `stream_chat`
@@ -19,4 +21,5 @@ It is aimed at local-model workflows such as:
 ## Docs
 
 - [Getting Started](getting-started.md)
+- [Model Management](model-management.md)
 - [Streaming](streaming.md)
