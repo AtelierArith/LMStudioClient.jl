@@ -391,29 +391,42 @@ end
         return Dict("job_id" => "job_timeout", "status" => "downloading")
     end
 
+    caught = nothing
     elapsed = @elapsed begin
-        @test_throws LMStudioClient.LMStudioTimeoutError LMStudioClient.wait_for_download(
-            client,
-            "job_timeout";
-            poll_interval=1.0,
-            timeout=0.05,
-            _transport=timeout_transport,
-        )
+        try
+            LMStudioClient.wait_for_download(
+                client,
+                "job_timeout";
+                poll_interval=1.0,
+                timeout=0.05,
+                _transport=timeout_transport,
+            )
+        catch e
+            caught = e
+        end
     end
     @test elapsed < 0.5
+    @test caught isa LMStudioClient.LMStudioTimeoutError
 
     slow_initial_transport = function (; method, path, body=nothing, stream, client)
+        result = Dict("job_id" => "job_slow", "status" => "completed", "downloaded_bytes" => 100, "total_size_bytes" => 100)
         sleep(0.1)
-        return Dict("job_id" => "job_slow", "status" => "completed", "downloaded_bytes" => 100, "total_size_bytes" => 100)
+        return result
     end
 
-    @test_throws LMStudioClient.LMStudioTimeoutError LMStudioClient.wait_for_download(
-        client,
-        "job_slow";
-        poll_interval=0.0,
-        timeout=0.05,
-        _transport=slow_initial_transport,
-    )
+    caught = nothing
+    try
+        LMStudioClient.wait_for_download(
+            client,
+            "job_slow";
+            poll_interval=0.0,
+            timeout=0.05,
+            _transport=slow_initial_transport,
+        )
+    catch e
+        caught = e
+    end
+    @test caught isa LMStudioClient.LMStudioTimeoutError
 
     poll_count = Ref(0)
     slow_followup_transport = function (; method, path, body=nothing, stream, client)

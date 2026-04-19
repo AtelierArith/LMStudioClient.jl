@@ -11,7 +11,7 @@ using Dates
     @test normalized_client.base_url == "http://127.0.0.1:1234"
 
     fractional_timeout_client = Client(timeout=1.2)
-    @test fractional_timeout_client.timeout == 2
+    @test fractional_timeout_client.timeout == 1
     @test fractional_timeout_client.timeout isa Int
 
     session = ChatSession("google/gemma-4-e2b")

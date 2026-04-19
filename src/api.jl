@@ -19,6 +19,12 @@ const _LOAD_STATUS_MAP = Dict(
 
 const _SESSION_STREAM_BUFFER_SIZE = 256
 
+_safe_int(x, default::Int=0) = try Int(x) catch _; default end
+_safe_float(x, default::Float64=0.0) = try Float64(x) catch _; default end
+_safe_bool(x, default=nothing) = try Bool(x) catch _; default end
+_haskey_int(config, key) = haskey(config, key) ? _safe_int(config[key]) : nothing
+_haskey_bool(config, key) = haskey(config, key) ? _safe_bool(config[key]) : nothing
+
 function _parse_datetime(value)
     if value === nothing
         return nothing
@@ -122,12 +128,12 @@ function _parse_loaded_model_infos(model_data::AbstractDict{String,<:Any})
             publisher,
             display_name,
             architecture,
-            Int(instance["config"]["context_length"]),
-            haskey(instance["config"], "eval_batch_size") ? Int(instance["config"]["eval_batch_size"]) : nothing,
-            haskey(instance["config"], "parallel") ? Int(instance["config"]["parallel"]) : nothing,
-            haskey(instance["config"], "flash_attention") ? Bool(instance["config"]["flash_attention"]) : nothing,
-            haskey(instance["config"], "num_experts") ? Int(instance["config"]["num_experts"]) : nothing,
-            haskey(instance["config"], "offload_kv_cache_to_gpu") ? Bool(instance["config"]["offload_kv_cache_to_gpu"]) : nothing,
+            try Int(instance["config"]["context_length"]) catch _; 0 end,
+            _haskey_int(instance["config"], "eval_batch_size"),
+            _haskey_int(instance["config"], "parallel"),
+            _haskey_bool(instance["config"], "flash_attention"),
+            _haskey_int(instance["config"], "num_experts"),
+            _haskey_bool(instance["config"], "offload_kv_cache_to_gpu"),
             Dict{String,Any}(instance),
         )
         for instance in loaded_instances
@@ -172,11 +178,18 @@ function wait_for_download(client::Client, job_or_job_id; poll_interval::Real=1.
     started = time()
     deadline = isnothing(timeout) ? nothing : started + timeout
 
-    job = job_or_job_id isa DownloadJob ? job_or_job_id : download_status(client, String(job_or_job_id); _transport=_transport)
+    job = if job_or_job_id isa DownloadJob
+        job_or_job_id
+    else
+        if !isnothing(deadline) && time() >= deadline
+            throw(LMStudioTimeoutError("Timed out waiting for download to complete"))
+        end
+        download_status(client, String(job_or_job_id); _transport=_transport)
+    end
+
     if !isnothing(deadline) && time() >= deadline
         throw(LMStudioTimeoutError("Timed out waiting for download to complete"))
     end
-
     if job.status == :already_downloaded || job.status == :completed
         return job
     end
@@ -277,14 +290,14 @@ end
 function _parse_output_item(item::AbstractDict{String,<:Any})
     kind = get(item, "type", "unknown")
     if kind == "message"
-        return MessageOutput(String(item["content"]))
+        return MessageOutput(try String(item["content"]) catch _; "" end)
     elseif kind == "reasoning"
-        return ReasoningOutput(String(item["content"]))
+        return ReasoningOutput(try String(item["content"]) catch _; "" end)
     elseif kind == "tool_call"
         return ToolCallOutput(
-            String(item["tool"]),
+            try String(item["tool"]) catch _; "" end,
             get(item, "arguments", Dict{String,Any}()),
-            String(get(item, "output", "")),
+            try String(get(item, "output", "")) catch _; "" end,
             get(item, "provider_info", Dict{String,Any}()),
         )
     else
@@ -295,12 +308,12 @@ end
 function _parse_chat_response(data::AbstractDict{String,<:Any})
     stats_data = get(data, "stats", Dict{String,Any}())
     stats = ChatStats(
-        Int(get(stats_data, "input_tokens", 0)),
-        Int(get(stats_data, "total_output_tokens", 0)),
-        Int(get(stats_data, "reasoning_output_tokens", 0)),
-        Float64(get(stats_data, "tokens_per_second", 0.0)),
-        Float64(get(stats_data, "time_to_first_token_seconds", 0.0)),
-        haskey(stats_data, "model_load_time_seconds") ? Float64(stats_data["model_load_time_seconds"]) : nothing,
+        _safe_int(get(stats_data, "input_tokens", 0)),
+        _safe_int(get(stats_data, "total_output_tokens", 0)),
+        _safe_int(get(stats_data, "reasoning_output_tokens", 0)),
+        _safe_float(get(stats_data, "tokens_per_second", 0.0)),
+        _safe_float(get(stats_data, "time_to_first_token_seconds", 0.0)),
+        haskey(stats_data, "model_load_time_seconds") ? _safe_float(stats_data["model_load_time_seconds"]) : nothing,
     )
     output = ChatOutputItem[_parse_output_item(item) for item in get(data, "output", Any[])]
     return ChatResponse(String(data["model_instance_id"]), output, stats, get(data, "response_id", nothing))

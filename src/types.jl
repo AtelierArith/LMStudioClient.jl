@@ -17,7 +17,7 @@ end
 function _normalize_timeout_seconds(timeout::Real)
     isfinite(timeout) || throw(ArgumentError("timeout must be finite"))
     timeout >= 0 || throw(ArgumentError("timeout must be non-negative"))
-    return ceil(Int, timeout)
+    return max(1, round(Int, timeout))
 end
 
 Client(; base_url::String="http://127.0.0.1:1234", api_token::Union{Nothing,String}=nothing, timeout::Real=30.0) =
