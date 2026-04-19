@@ -54,7 +54,8 @@ using LMStudioClient
 
 client = Client()
 
-println(server_status(client).reachable)
+status = server_status(client)
+println("reachable=$(status.reachable), authenticated=$(status.authenticated)")
 
 models = list_models(client; domain=:llm)
 if isempty(models)

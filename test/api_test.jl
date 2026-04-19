@@ -578,6 +578,14 @@ end
     @test structured_unauthorized.authenticated == false
     @test isnothing(structured_unauthorized.model_count)
 
+    structured_auth_type_transport = function (; method, path, body=nothing, stream, client)
+        throw(LMStudioClient.LMStudioAPIError("authentication_error", "api key missing", nothing, nothing))
+    end
+    structured_auth_type = LMStudioClient.server_status(client; _transport=structured_auth_type_transport)
+    @test structured_auth_type.reachable == true
+    @test structured_auth_type.authenticated == false
+    @test isnothing(structured_auth_type.model_count)
+
     timeout_transport = function (; method, path, body=nothing, stream, client)
         throw(LMStudioClient.LMStudioTimeoutError("Timed out"))
     end

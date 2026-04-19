@@ -221,6 +221,23 @@ function _parse_unload_result(data::AbstractDict{String,<:Any})
     return UnloadModelResult(String(data["instance_id"]), Dict{String,Any}(data))
 end
 
+const _AUTH_API_ERROR_TYPES = Set((
+    "auth_error",
+    "authentication_error",
+    "forbidden",
+    "permission_denied",
+    "unauthenticated",
+    "unauthorized",
+))
+
+function _is_auth_api_error(err::LMStudioAPIError)
+    if !isnothing(err.code) && (err.code == "401" || err.code == "403")
+        return true
+    end
+
+    return lowercase(err.error_type) in _AUTH_API_ERROR_TYPES
+end
+
 function unload_model(client::Client, instance_id::String; _transport=_request_adapter)
     data = _transport(
         ; method="POST",
@@ -243,7 +260,7 @@ function server_status(client::Client; _transport=_request_adapter)
             end
             return ServerStatus(true, nothing, nothing, :http, err)
         elseif err isa LMStudioAPIError
-            if !isnothing(err.code) && (err.code == "401" || err.code == "403")
+            if _is_auth_api_error(err)
                 return ServerStatus(true, false, nothing, nothing, err)
             end
             return ServerStatus(true, true, nothing, :api, err)

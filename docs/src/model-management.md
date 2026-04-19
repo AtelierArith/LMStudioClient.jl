@@ -7,7 +7,7 @@ using LMStudioClient
 
 client = Client()
 status = server_status(client)
-println(status.reachable)
+println("reachable=$(status.reachable), authenticated=$(status.authenticated)")
 ```
 
 ## List Downloaded Models
