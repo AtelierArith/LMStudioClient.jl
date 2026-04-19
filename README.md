@@ -14,6 +14,36 @@ It supports:
 - stateful chat with `ChatSession`
 - streaming chat via `stream_chat`
 
+## Relationship To PromptingTools.jl
+
+`PromptingTools.jl` and `LMStudioClient.jl` live at different layers.
+`PromptingTools.jl` is a higher-level prompting interface, while `LMStudioClient.jl`
+provides thin access to LM Studio's native REST API for model management and
+native chat flows.
+
+Features that are often easier to cover with `PromptingTools.jl`:
+
+| Feature | Easy to replace with `PromptingTools.jl`? | Notes |
+| --- | --- | --- |
+| One-shot text generation | Yes | `PromptingTools.jl` can target OpenAI-compatible APIs, so LM Studio's `/v1/chat/completions` style usage fits naturally there. |
+| Embeddings | Yes | `PromptingTools.jl` provides `aiembed` for embedding-oriented workflows. |
+| Client-managed multi-turn chat | Mostly | `PromptingTools.jl` can keep and resend conversation history, even though that is different from LM Studio's server-side state. |
+| Prompt templates and REPL ergonomics | Yes | This is one of the main strengths of `PromptingTools.jl` via `aigenerate`, `@ai_str`, and related helpers. |
+| High-level extraction and classification workflows | Often | `PromptingTools.jl` offers higher-level helpers such as `aiextract` and `aiclassify`. |
+
+Features where `LMStudioClient.jl` is the better fit:
+
+| Feature | Why `LMStudioClient.jl` fits better | Status in this package |
+| --- | --- | --- |
+| Model download, load, unload, and listing | These use LM Studio native `/api/v1/models*` endpoints rather than OpenAI-compatible inference APIs. | Supported |
+| Server-side stateful chat | LM Studio native `/api/v1/chat` returns `response_id` values for continuing or branching conversations without resending full history. | Supported via `ChatSession` |
+| Native streaming event types | LM Studio native streams include `model_load.*`, `prompt_processing.*`, `reasoning.*`, `tool_call.*`, `message.*`, and `chat.end`. | Supported via `stream_chat` |
+| Load-time runtime controls | Native load requests expose LM Studio-specific knobs such as `context_length`, `eval_batch_size`, `flash_attention`, `num_experts`, and `offload_kv_cache_to_gpu`. | Supported |
+| Download job polling | Native download endpoints expose statuses such as `downloading`, `completed`, and `already_downloaded`, plus progress metadata. | Supported |
+
+LM Studio's native API also includes capabilities such as MCP via API, but this
+package currently focuses on the flows listed above.
+
 ## Prerequisites
 
 - Julia 1.12+
