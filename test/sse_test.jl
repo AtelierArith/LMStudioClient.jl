@@ -1,5 +1,6 @@
 using Test
 using LMStudioClient
+using HTTP
 
 function wait_until(predicate::Function; timeout::Real=1.0)
     deadline = time() + timeout
@@ -225,4 +226,77 @@ end
 
     rest = collect(events)
     @test any(event -> event isa ChatEndEvent, rest)
+end
+
+@testset "stream_chat surfaces producer API errors directly" begin
+    fake_stream_transport = function (; method, path, body, stream, client)
+        @test method == "POST"
+        @test path == "/api/v1/chat"
+        @test stream == true
+        @test body["stream"] == true
+        return Channel{String}(1) do channel
+            throw(LMStudioClient.LMStudioAPIError("invalid_request", "Invalid model identifier", "model_not_found", "model"))
+        end
+    end
+
+    client = Client()
+    err = try
+        collect(stream_chat(client; model="definitely/not-a-real-model", input="Say hello.", _stream_transport=fake_stream_transport))
+        nothing
+    catch err
+        err
+    end
+    @test err isa LMStudioClient.LMStudioAPIError
+    @test err.error_type == "invalid_request"
+    @test err.code == "model_not_found"
+end
+
+@testset "stream_chat unwraps HTTP request errors to LMStudio API errors" begin
+    fake_stream_transport = function (; method, path, body, stream, client)
+        @test method == "POST"
+        @test path == "/api/v1/chat"
+        @test stream == true
+        @test body["stream"] == true
+        return Channel{String}(1) do channel
+            request = HTTP.Request("POST", "http://127.0.0.1:1234/api/v1/chat")
+            api_error = LMStudioClient.LMStudioAPIError("invalid_request", "Invalid model identifier", "model_not_found", "model")
+            throw(HTTP.Exceptions.RequestError(request, api_error))
+        end
+    end
+
+    client = Client()
+    err = try
+        collect(stream_chat(client; model="definitely/not-a-real-model", input="Say hello.", _stream_transport=fake_stream_transport))
+        nothing
+    catch err
+        err
+    end
+    @test err isa LMStudioClient.LMStudioAPIError
+    @test err.error_type == "invalid_request"
+    @test err.code == "model_not_found"
+end
+
+@testset "stream_chat session overload surfaces producer API errors directly" begin
+    fake_stream_transport = function (; method, path, body, stream, client)
+        @test method == "POST"
+        @test path == "/api/v1/chat"
+        @test stream == true
+        @test body["stream"] == true
+        return Channel{String}(1) do channel
+            throw(LMStudioClient.LMStudioAPIError("invalid_request", "Invalid model identifier", "model_not_found", "model"))
+        end
+    end
+
+    client = Client()
+    session = ChatSession("definitely/not-a-real-model")
+    err = try
+        collect(stream_chat(client, session, "Say hello."; _stream_transport=fake_stream_transport))
+        nothing
+    catch err
+        err
+    end
+    @test err isa LMStudioClient.LMStudioAPIError
+    @test err.error_type == "invalid_request"
+    @test err.code == "model_not_found"
+    @test isnothing(session.previous_response_id)
 end

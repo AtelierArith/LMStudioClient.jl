@@ -402,7 +402,7 @@ function stream_chat(client::Client, session::ChatSession, input; kwargs...)
         end
     end
 
-    return Channel{LMStudioEvent}(32) do channel
+    return _error_aware_channel(LMStudioEvent, 32) do channel
         index = 1
         while true
             while index <= length(buffered_events)
