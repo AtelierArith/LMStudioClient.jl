@@ -124,7 +124,7 @@ function load_model(client::Client, model::String; context_length::Union{Nothing
     !isnothing(offload_kv_cache_to_gpu) && (body["offload_kv_cache_to_gpu"] = offload_kv_cache_to_gpu)
 
     data = _transport(; method="POST", path="/api/v1/models/load", body=body, stream=false, client=client)
-    return LoadedModel(
+    return LoadModelResult(
         _parse_load_type(String(data["type"])),
         String(data["instance_id"]),
         _parse_load_status(String(data["status"])),

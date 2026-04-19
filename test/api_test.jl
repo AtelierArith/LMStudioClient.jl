@@ -229,6 +229,7 @@ end
     @test job.status == :completed
 
     loaded = LMStudioClient.load_model(client, "google/gemma-4-e2b"; context_length=8192, _transport=fake_transport)
+    @test loaded isa LoadModelResult
     @test loaded.instance_id == "google/gemma-4-e2b"
     @test loaded.load_config["context_length"] == 8192
     @test loaded.type == :llm
@@ -275,6 +276,7 @@ end
         context_length=2048,
         _transport=embedding_load_transport,
     )
+    @test embedding_loaded isa LoadModelResult
     @test embedding_loaded.type == :embedding
     @test embedding_loaded.status == :loaded
     @test embedding_loaded.instance_id == "nomic-embed-text-v1.5"

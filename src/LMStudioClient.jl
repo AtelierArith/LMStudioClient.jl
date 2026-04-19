@@ -9,7 +9,7 @@ include("sse.jl")
 export Client
 export ChatSession
 export DownloadJob
-export LoadedModel
+export LoadModelResult
 export ChatStats
 export ChatResponse
 export ChatOutputItem

@@ -35,7 +35,7 @@ struct DownloadJob
     estimated_completion::Union{Nothing,DateTime}
 end
 
-struct LoadedModel
+struct LoadModelResult
     type::Symbol
     instance_id::String
     status::Symbol
