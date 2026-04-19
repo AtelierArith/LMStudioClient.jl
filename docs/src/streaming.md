@@ -28,6 +28,7 @@ Replace `google/gemma-4-e2b` with a model that is actually available on your loc
 
 - Make sure the LM Studio server is running.
 - Make sure the model name you pass to `stream_chat` is available in your LM Studio setup.
+- Confirm the exact model identifier in LM Studio before you run the sample. If you use the `lms` CLI, `lms ls` shows installed models and `lms ps` shows loaded ones.
 - If you want a shell-friendly script, read `base_url` and `model` from `LMSTUDIO_BASE_URL` and `LMSTUDIO_MODEL`.
 
 ## Important Event Types

@@ -12,6 +12,8 @@ By default, `Client()` targets `http://127.0.0.1:1234`. Make sure the LM Studio 
 
 If your LM Studio server is exposed on another host or needs authentication, construct the client with `Client(base_url=..., api_token=...)`.
 
+Before you use the examples below, confirm the exact model identifier in LM Studio itself. If you use the `lms` CLI, `lms ls` shows installed models and `lms ps` shows loaded ones.
+
 ## Download And Load A Model
 
 Replace `google/gemma-4-e2b` with any model that is available in your local LM Studio install.

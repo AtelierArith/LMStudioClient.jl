@@ -16,6 +16,8 @@ It supports:
 - A running LM Studio server
 - By default, `Client()` connects to `http://127.0.0.1:1234`
 
+Before you run the examples below, confirm the exact model identifier in LM Studio itself. If you use the `lms` CLI, `lms ls` shows installed models and `lms ps` shows loaded models.
+
 ## Installation
 
 Clone the repository first, then run Julia from the repository root:
@@ -48,6 +50,7 @@ using LMStudioClient
 
 client = Client()
 
+# Replace this with a model identifier that exists in your LM Studio setup.
 job = download_model(client, "google/gemma-4-e2b")
 wait_for_download(client, job; timeout=1800)
 
@@ -72,6 +75,8 @@ client = Client(
 )
 
 # Replace the model name with one that exists in your LM Studio setup.
+# Confirm the exact identifier in LM Studio first. If you use the CLI,
+# `lms ls` shows installed models and `lms ps` shows loaded ones.
 model = get(ENV, "LMSTUDIO_MODEL", "google/gemma-4-e2b")
 
 for event in stream_chat(client; model=model, input="Say hello")
