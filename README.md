@@ -114,3 +114,4 @@ julia --project=docs docs/make.jl
 ```
 
 Then open `docs/build/index.html`.
+# LMStudioClient.jl
