@@ -243,6 +243,9 @@ function server_status(client::Client; _transport=_request_adapter)
             end
             return ServerStatus(true, nothing, nothing, :http, err)
         elseif err isa LMStudioAPIError
+            if !isnothing(err.code) && (err.code == "401" || err.code == "403")
+                return ServerStatus(true, false, nothing, nothing, err)
+            end
             return ServerStatus(true, true, nothing, :api, err)
         elseif err isa LMStudioTimeoutError
             return ServerStatus(false, nothing, nothing, :timeout, err)

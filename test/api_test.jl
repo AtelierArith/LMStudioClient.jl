@@ -570,6 +570,14 @@ end
     @test unauthorized.authenticated == false
     @test isnothing(unauthorized.model_count)
 
+    structured_unauthorized_transport = function (; method, path, body=nothing, stream, client)
+        throw(LMStudioClient.LMStudioAPIError("unauthorized", "unauthorized", "401", nothing))
+    end
+    structured_unauthorized = LMStudioClient.server_status(client; _transport=structured_unauthorized_transport)
+    @test structured_unauthorized.reachable == true
+    @test structured_unauthorized.authenticated == false
+    @test isnothing(structured_unauthorized.model_count)
+
     timeout_transport = function (; method, path, body=nothing, stream, client)
         throw(LMStudioClient.LMStudioTimeoutError("Timed out"))
     end
