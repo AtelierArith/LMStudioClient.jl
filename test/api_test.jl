@@ -537,3 +537,50 @@ end
     @test occursin("session-owned", sprint(showerror, err))
     @test called[] == false
 end
+
+@testset "unload and server status APIs" begin
+    captured = Ref{Any}(nothing)
+    unload_transport = function (; method, path, body, stream, client)
+        captured[] = (; method, path, body, stream)
+        return Dict("instance_id" => "google/gemma-4-e2b:9")
+    end
+
+    client = Client()
+    unloaded = LMStudioClient.unload_model(client, "google/gemma-4-e2b:9"; _transport=unload_transport)
+    @test captured[].method == "POST"
+    @test captured[].path == "/api/v1/models/unload"
+    @test captured[].body["instance_id"] == "google/gemma-4-e2b:9"
+    @test unloaded isa UnloadModelResult
+    @test unloaded.instance_id == "google/gemma-4-e2b:9"
+
+    ok_transport = function (; method, path, body=nothing, stream, client)
+        return Dict("models" => Any[Dict("type" => "llm", "key" => "google/gemma-4-e2b", "display_name" => "Gemma", "publisher" => "google", "loaded_instances" => Any[], "size_bytes" => 1, "max_context_length" => 1)])
+    end
+    ok_status = LMStudioClient.server_status(client; _transport=ok_transport)
+    @test ok_status.reachable == true
+    @test ok_status.authenticated == true
+    @test ok_status.model_count == 1
+    @test isnothing(ok_status.error_kind)
+
+    unauthorized_transport = function (; method, path, body=nothing, stream, client)
+        throw(LMStudioClient.LMStudioHTTPError(401, "unauthorized"))
+    end
+    unauthorized = LMStudioClient.server_status(client; _transport=unauthorized_transport)
+    @test unauthorized.reachable == true
+    @test unauthorized.authenticated == false
+    @test isnothing(unauthorized.model_count)
+
+    timeout_transport = function (; method, path, body=nothing, stream, client)
+        throw(LMStudioClient.LMStudioTimeoutError("Timed out"))
+    end
+    timed_out = LMStudioClient.server_status(client; _transport=timeout_transport)
+    @test timed_out.reachable == false
+    @test timed_out.error_kind == :timeout
+
+    transport_failure = function (; method, path, body=nothing, stream, client)
+        throw(IOError("boom"))
+    end
+    failed = LMStudioClient.server_status(client; _transport=transport_failure)
+    @test failed.reachable == false
+    @test failed.error_kind == :transport
+end

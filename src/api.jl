@@ -217,6 +217,41 @@ function load_model(client::Client, model::String; context_length::Union{Nothing
     )
 end
 
+function _parse_unload_result(data::AbstractDict{String,<:Any})
+    return UnloadModelResult(String(data["instance_id"]), Dict{String,Any}(data))
+end
+
+function unload_model(client::Client, instance_id::String; _transport=_request_adapter)
+    data = _transport(
+        ; method="POST",
+        path="/api/v1/models/unload",
+        body=Dict{String,Any}("instance_id" => instance_id),
+        stream=false,
+        client=client,
+    )
+    return _parse_unload_result(data)
+end
+
+function server_status(client::Client; _transport=_request_adapter)
+    try
+        data = _transport(; method="GET", path="/api/v1/models", body=nothing, stream=false, client=client)
+        return ServerStatus(true, true, length(get(data, "models", Any[])), nothing, nothing)
+    catch err
+        if err isa LMStudioHTTPError
+            if err.status == 401 || err.status == 403
+                return ServerStatus(true, false, nothing, nothing, err)
+            end
+            return ServerStatus(true, nothing, nothing, :http, err)
+        elseif err isa LMStudioAPIError
+            return ServerStatus(true, true, nothing, :api, err)
+        elseif err isa LMStudioTimeoutError
+            return ServerStatus(false, nothing, nothing, :timeout, err)
+        else
+            return ServerStatus(false, nothing, nothing, :transport, err)
+        end
+    end
+end
+
 function _parse_output_item(item::AbstractDict{String,<:Any})
     kind = get(item, "type", "unknown")
     if kind == "message"

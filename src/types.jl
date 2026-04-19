@@ -77,6 +77,19 @@ struct LoadModelResult
     load_config::Dict{String,Any}
 end
 
+struct UnloadModelResult
+    instance_id::String
+    raw::Dict{String,Any}
+end
+
+struct ServerStatus
+    reachable::Bool
+    authenticated::Union{Nothing,Bool}
+    model_count::Union{Nothing,Int}
+    error_kind::Union{Nothing,Symbol}
+    raw_error::Union{Nothing,Any}
+end
+
 struct ChatStats
     input_tokens::Int
     total_output_tokens::Int

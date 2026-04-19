@@ -12,6 +12,8 @@ export DownloadJob
 export ModelInfo
 export LoadedModelInfo
 export LoadModelResult
+export UnloadModelResult
+export ServerStatus
 export ChatStats
 export ChatResponse
 export ChatOutputItem
@@ -42,6 +44,8 @@ export ChatEndEvent
 export UnknownEvent
 export download_model
 export download_status
+export unload_model
+export server_status
 export list_models
 export list_loaded_models
 export wait_for_download
