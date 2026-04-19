@@ -1,0 +1,16 @@
+# Julia package development
+Manifest.toml
+*.jl.cov
+*.jl.*.cov
+*.mem
+
+# Local docs output and ad-hoc reports
+docs/build/
+docs/test-reports/
+
+# Local scratch work
+tmp/
+lmstudio-js/
+
+# macOS
+.DS_Store
