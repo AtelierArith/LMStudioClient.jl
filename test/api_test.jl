@@ -310,6 +310,15 @@ end
                                 "offload_kv_cache_to_gpu" => true,
                             ),
                         ),
+                        Dict(
+                            "id" => "google/gemma-4-e2b:2",
+                            "config" => Dict(
+                                "context_length" => 4096,
+                                "eval_batch_size" => 256,
+                                "parallel" => 2,
+                                "flash_attention" => false,
+                            ),
+                        ),
                     ],
                     "max_context_length" => 131072,
                     "format" => "gguf",
@@ -350,12 +359,20 @@ end
     @test llm_only[1].type == :llm
 
     loaded = LMStudioClient.list_loaded_models(client; _transport=fake_transport)
-    @test length(loaded) == 1
+    @test captured[].method == "GET"
+    @test captured[].path == "/api/v1/models"
+    @test isnothing(captured[].body)
+    @test length(loaded) == 2
     @test loaded[1] isa LoadedModelInfo
     @test loaded[1].instance_id == "google/gemma-4-e2b:1"
     @test loaded[1].model_key == "google/gemma-4-e2b"
     @test loaded[1].context_length == 8192
     @test loaded[1].parallel == 4
+    @test loaded[2].instance_id == "google/gemma-4-e2b:2"
+    @test loaded[2].context_length == 4096
+    @test loaded[2].eval_batch_size == 256
+    @test loaded[2].parallel == 2
+    @test loaded[2].flash_attention == false
 
     embedding_only = LMStudioClient.list_loaded_models(client; domain=:embedding, _transport=fake_transport)
     @test isempty(embedding_only)
