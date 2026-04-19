@@ -283,6 +283,84 @@ end
     @test embedding_loaded.load_config["context_length"] == 2048
 end
 
+@testset "model listing APIs" begin
+    captured = Ref{Any}(nothing)
+    fake_transport = function (; method, path, body=nothing, stream, client)
+        captured[] = (; method, path, body, stream)
+        return Dict(
+            "models" => Any[
+                Dict(
+                    "type" => "llm",
+                    "publisher" => "google",
+                    "key" => "google/gemma-4-e2b",
+                    "display_name" => "Gemma 4 E2B",
+                    "architecture" => "gemma4",
+                    "quantization" => Dict("name" => "Q4_K_M", "bits_per_weight" => 4),
+                    "size_bytes" => 4410000000,
+                    "params_string" => "4.6B",
+                    "loaded_instances" => Any[
+                        Dict(
+                            "id" => "google/gemma-4-e2b:1",
+                            "config" => Dict(
+                                "context_length" => 8192,
+                                "eval_batch_size" => 512,
+                                "parallel" => 4,
+                                "flash_attention" => true,
+                                "num_experts" => 0,
+                                "offload_kv_cache_to_gpu" => true,
+                            ),
+                        ),
+                    ],
+                    "max_context_length" => 131072,
+                    "format" => "gguf",
+                    "capabilities" => Dict("vision" => false, "trained_for_tool_use" => true),
+                    "description" => nothing,
+                    "variants" => Any["google/gemma-4-e2b@q4_k_m"],
+                    "selected_variant" => "google/gemma-4-e2b@q4_k_m",
+                ),
+                Dict(
+                    "type" => "embedding",
+                    "publisher" => "nomic",
+                    "key" => "text-embedding-nomic-embed-text-v1.5",
+                    "display_name" => "Nomic Embed Text v1.5",
+                    "quantization" => Dict("name" => "F16", "bits_per_weight" => 16),
+                    "size_bytes" => 84000000,
+                    "params_string" => nothing,
+                    "loaded_instances" => Any[],
+                    "max_context_length" => 2048,
+                    "format" => "gguf",
+                ),
+            ],
+        )
+    end
+
+    client = Client()
+    models = LMStudioClient.list_models(client; _transport=fake_transport)
+    @test captured[].method == "GET"
+    @test captured[].path == "/api/v1/models"
+    @test isnothing(captured[].body)
+    @test length(models) == 2
+    @test models[1] isa ModelInfo
+    @test models[1].type == :llm
+    @test models[1].key == "google/gemma-4-e2b"
+    @test models[2].type == :embedding
+
+    llm_only = LMStudioClient.list_models(client; domain=:llm, _transport=fake_transport)
+    @test length(llm_only) == 1
+    @test llm_only[1].type == :llm
+
+    loaded = LMStudioClient.list_loaded_models(client; _transport=fake_transport)
+    @test length(loaded) == 1
+    @test loaded[1] isa LoadedModelInfo
+    @test loaded[1].instance_id == "google/gemma-4-e2b:1"
+    @test loaded[1].model_key == "google/gemma-4-e2b"
+    @test loaded[1].context_length == 8192
+    @test loaded[1].parallel == 4
+
+    embedding_only = LMStudioClient.list_loaded_models(client; domain=:embedding, _transport=fake_transport)
+    @test isempty(embedding_only)
+end
+
 @testset "Task 3 quality fixes" begin
     client = Client()
 

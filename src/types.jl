@@ -35,6 +35,40 @@ struct DownloadJob
     estimated_completion::Union{Nothing,DateTime}
 end
 
+struct ModelInfo
+    type::Symbol
+    publisher::String
+    key::String
+    display_name::String
+    architecture::Union{Nothing,String}
+    quantization::Union{Nothing,Dict{String,Any}}
+    size_bytes::Int
+    params_string::Union{Nothing,String}
+    max_context_length::Int
+    format::Union{Nothing,String}
+    capabilities::Dict{String,Any}
+    description::Union{Nothing,String}
+    variants::Vector{String}
+    selected_variant::Union{Nothing,String}
+    raw::Dict{String,Any}
+end
+
+struct LoadedModelInfo
+    instance_id::String
+    model_key::String
+    type::Symbol
+    publisher::String
+    display_name::String
+    architecture::Union{Nothing,String}
+    context_length::Int
+    eval_batch_size::Union{Nothing,Int}
+    parallel::Union{Nothing,Int}
+    flash_attention::Union{Nothing,Bool}
+    num_experts::Union{Nothing,Int}
+    offload_kv_cache_to_gpu::Union{Nothing,Bool}
+    raw::Dict{String,Any}
+end
+
 struct LoadModelResult
     type::Symbol
     instance_id::String

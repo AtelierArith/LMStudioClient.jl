@@ -9,6 +9,8 @@ include("sse.jl")
 export Client
 export ChatSession
 export DownloadJob
+export ModelInfo
+export LoadedModelInfo
 export LoadModelResult
 export ChatStats
 export ChatResponse
@@ -40,6 +42,8 @@ export ChatEndEvent
 export UnknownEvent
 export download_model
 export download_status
+export list_models
+export list_loaded_models
 export wait_for_download
 export load_model
 export chat

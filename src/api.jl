@@ -67,6 +67,72 @@ function _parse_download_job(data::AbstractDict{String,<:Any})
     )
 end
 
+function _parse_model_info(data::AbstractDict{String,<:Any})
+    ModelInfo(
+        _parse_load_type(String(data["type"])),
+        String(get(data, "publisher", "")),
+        String(data["key"]),
+        String(get(data, "display_name", data["key"])),
+        isnothing(get(data, "architecture", nothing)) ? nothing : String(data["architecture"]),
+        isnothing(get(data, "quantization", nothing)) ? nothing : Dict{String,Any}(data["quantization"]),
+        Int(get(data, "size_bytes", 0)),
+        isnothing(get(data, "params_string", nothing)) ? nothing : String(data["params_string"]),
+        Int(get(data, "max_context_length", 0)),
+        isnothing(get(data, "format", nothing)) ? nothing : String(data["format"]),
+        haskey(data, "capabilities") ? Dict{String,Any}(data["capabilities"]) : Dict{String,Any}(),
+        isnothing(get(data, "description", nothing)) ? nothing : String(data["description"]),
+        [String(item) for item in get(data, "variants", Any[])],
+        isnothing(get(data, "selected_variant", nothing)) ? nothing : String(data["selected_variant"]),
+        Dict{String,Any}(data),
+    )
+end
+
+function _parse_loaded_model_infos(model_data::AbstractDict{String,<:Any})
+    model_type = _parse_load_type(String(model_data["type"]))
+    publisher = String(get(model_data, "publisher", ""))
+    model_key = String(model_data["key"])
+    display_name = String(get(model_data, "display_name", model_key))
+    architecture = isnothing(get(model_data, "architecture", nothing)) ? nothing : String(model_data["architecture"])
+
+    return LoadedModelInfo[
+        LoadedModelInfo(
+            String(instance["id"]),
+            model_key,
+            model_type,
+            publisher,
+            display_name,
+            architecture,
+            Int(instance["config"]["context_length"]),
+            haskey(instance["config"], "eval_batch_size") ? Int(instance["config"]["eval_batch_size"]) : nothing,
+            haskey(instance["config"], "parallel") ? Int(instance["config"]["parallel"]) : nothing,
+            haskey(instance["config"], "flash_attention") ? Bool(instance["config"]["flash_attention"]) : nothing,
+            haskey(instance["config"], "num_experts") ? Int(instance["config"]["num_experts"]) : nothing,
+            haskey(instance["config"], "offload_kv_cache_to_gpu") ? Bool(instance["config"]["offload_kv_cache_to_gpu"]) : nothing,
+            Dict{String,Any}(instance),
+        )
+        for instance in get(model_data, "loaded_instances", Any[])
+    ]
+end
+
+function list_models(client::Client; domain=nothing, _transport=_request_adapter)
+    data = _transport(; method="GET", path="/api/v1/models", body=nothing, stream=false, client=client)
+    models = [_parse_model_info(model) for model in get(data, "models", Any[])]
+    isnothing(domain) && return models
+    return [model for model in models if model.type == domain]
+end
+
+function list_loaded_models(client::Client; domain=nothing, _transport=_request_adapter)
+    data = _transport(; method="GET", path="/api/v1/models", body=nothing, stream=false, client=client)
+    loaded = LoadedModelInfo[]
+    for model in get(data, "models", Any[])
+        model_type = _parse_load_type(String(model["type"]))
+        if isnothing(domain) || model_type == domain
+            append!(loaded, _parse_loaded_model_infos(model))
+        end
+    end
+    return loaded
+end
+
 function download_model(client::Client, model::String; quantization::Union{Nothing,String}=nothing, _transport=_request_adapter)
     body = Dict{String,Any}("model" => model)
     if !isnothing(quantization)
