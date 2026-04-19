@@ -25,7 +25,11 @@ status = server_status(client)
 println(status.reachable)
 
 models = list_models(client; domain=:llm)
-println(first(models).key)
+if isempty(models)
+    println("No LLM models installed.")
+else
+    println(first(models).key)
+end
 ```
 
 ## Download And Load A Model

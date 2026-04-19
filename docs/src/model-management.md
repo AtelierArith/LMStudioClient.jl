@@ -31,6 +31,12 @@ end
 ## Unload A Model
 
 ```julia
-result = unload_model(client, "google/gemma-4-e2b:1")
-println(result.instance_id)
+loaded = list_loaded_models(client)
+
+if isempty(loaded)
+    println("No loaded models to unload.")
+else
+    result = unload_model(client, first(loaded).instance_id)
+    println(result.instance_id)
+end
 ```

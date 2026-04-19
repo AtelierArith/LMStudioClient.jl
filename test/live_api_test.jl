@@ -17,10 +17,6 @@ else
         @test status.reachable == true
         @test status.authenticated in (true, nothing)
 
-        models = list_models(client)
-        @test !isempty(models)
-        @test any(model -> model.key == model_name || startswith(model.key, model_name), models)
-
         job = download_model(client, model)
         if isnothing(job.job_id)
             @test job.status == :already_downloaded
@@ -32,6 +28,10 @@ else
         end
         final_job = wait_for_download(client, job; poll_interval=1.0, timeout=1800)
         @test final_job.status in (:already_downloaded, :completed)
+
+        models = list_models(client)
+        @test !isempty(models)
+        @test any(model -> model.key == model_name || startswith(model.key, model_name), models)
 
         loaded = load_model(client, model; context_length=8192)
         @test loaded.status == :loaded

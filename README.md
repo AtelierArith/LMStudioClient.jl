@@ -57,7 +57,11 @@ client = Client()
 println(server_status(client).reachable)
 
 models = list_models(client; domain=:llm)
-println(first(models).key)
+if isempty(models)
+    println("No LLM models installed.")
+else
+    println(first(models).key)
+end
 
 # Replace this with a model identifier that exists in your LM Studio setup.
 job = download_model(client, "google/gemma-4-e2b")
