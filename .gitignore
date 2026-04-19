@@ -7,6 +7,7 @@ Manifest.toml
 # Local docs output and ad-hoc reports
 docs/build/
 docs/test-reports/
+docs/superpowers/
 
 # Local scratch work
 tmp/
