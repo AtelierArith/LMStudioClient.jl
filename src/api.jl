@@ -316,7 +316,7 @@ function _parse_chat_response(data::AbstractDict{String,<:Any})
         haskey(stats_data, "model_load_time_seconds") ? _safe_float(stats_data["model_load_time_seconds"]) : nothing,
     )
     output = ChatOutputItem[_parse_output_item(item) for item in get(data, "output", Any[])]
-    return ChatResponse(String(data["model_instance_id"]), output, stats, get(data, "response_id", nothing))
+    return ChatResponse(String(get(data, "model_instance_id", "unknown")), output, stats, get(data, "response_id", nothing))
 end
 
 function chat(client::Client; model::String, input, system_prompt::Union{Nothing,String}=nothing, previous_response_id::Union{Nothing,String}=nothing, store::Bool=true, temperature=nothing, top_p=nothing, top_k=nothing, min_p=nothing, repeat_penalty=nothing, max_output_tokens=nothing, reasoning=nothing, context_length=nothing, _transport=_request_adapter)
