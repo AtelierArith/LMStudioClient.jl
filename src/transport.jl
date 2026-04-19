@@ -62,28 +62,26 @@ end
 
 function _stream_request_lines(client::Client, method::String, path::String; body::Union{Nothing,Dict{String,Any}}=Dict{String,Any}())
     return Channel{String}(32) do lines
-        open_stream = if body === nothing
-            callback -> HTTP.open(
-                callback,
-                method,
-                string(client.base_url, path),
-                _headers(client; include_content_type=false);
-                readtimeout=client.timeout,
-                status_exception=false,
-            )
-        else
-            callback -> HTTP.open(
-                callback,
-                method,
-                string(client.base_url, path),
-                _headers(client),
-                JSON3.write(body);
-                readtimeout=client.timeout,
-                status_exception=false,
-            )
+        request_body = body === nothing ? nothing : JSON3.write(body)
+        headers = body === nothing ? _headers(client; include_content_type=false) : _headers(client)
+        normalize_line(raw_line::Vector{UInt8}) = begin
+            line = String(raw_line)
+            endswith(line, "\n") && (line = chop(line))
+            endswith(line, "\r") && (line = chop(line))
+            line
         end
 
-        open_stream(function(io)
+        HTTP.open(
+            method,
+            string(client.base_url, path),
+            headers;
+            readtimeout=client.timeout,
+            status_exception=false,
+        ) do io
+            if !isnothing(request_body)
+                write(io, request_body)
+                closewrite(io)
+            end
             response = HTTP.startread(io)
             if response.status < 200 || response.status >= 300
                 body = String(read(io))
@@ -91,10 +89,24 @@ function _stream_request_lines(client::Client, method::String, path::String; bod
                 !isnothing(api_error) && throw(api_error)
                 throw(LMStudioHTTPError(response.status, body))
             end
-            for line in eachline(io)
-                put!(lines, line)
+            pending = UInt8[]
+            while !eof(io)
+                chunk = readavailable(io)
+                isempty(chunk) && continue
+                append!(pending, chunk)
+
+                while true
+                    newline_index = findfirst(==(UInt8('\n')), pending)
+                    isnothing(newline_index) && break
+                    put!(lines, normalize_line(pending[1:newline_index]))
+                    deleteat!(pending, 1:newline_index)
+                end
             end
-        end)
+
+            if !isempty(pending)
+                put!(lines, normalize_line(pending))
+            end
+        end
     end
 end
 

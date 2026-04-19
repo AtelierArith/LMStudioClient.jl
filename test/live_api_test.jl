@@ -13,6 +13,14 @@ else
         model = get(ENV, "LMSTUDIO_TEST_MODEL", "google/gemma-4-e2b")
 
         job = download_model(client, model)
+        if isnothing(job.job_id)
+            @test job.status == :already_downloaded
+        else
+            status_job = download_status(client, something(job.job_id))
+            @test status_job.job_id == job.job_id
+            @test status_job.status in (:completed, :downloading)
+            @test !isnothing(status_job.total_size_bytes)
+        end
         final_job = wait_for_download(client, job; poll_interval=1.0, timeout=1800)
         @test final_job.status in (:already_downloaded, :completed)
 

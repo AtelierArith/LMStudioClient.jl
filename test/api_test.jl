@@ -111,6 +111,72 @@ end
     end
 end
 
+@testset "stream transport sends request body and yields SSE lines" begin
+    request_body = Ref("")
+
+    handler = function (http::HTTP.Stream)
+        request_body[] = String(read(http))
+        HTTP.setstatus(http, 200)
+        HTTP.setheader(http, "Content-Type" => "text/event-stream")
+        HTTP.setheader(http, "Cache-Control" => "no-cache")
+        HTTP.startwrite(http)
+        write(http, "event: message.delta\n")
+        write(http, "data: {\"type\":\"message.delta\",\"content\":\"Hello\"}\n\n")
+        write(http, "event: chat.end\n")
+        write(http, "data: {\"type\":\"chat.end\",\"result\":{\"model_instance_id\":\"google/gemma-4-e2b\",\"output\":[],\"stats\":{\"input_tokens\":1,\"total_output_tokens\":1,\"reasoning_output_tokens\":0,\"tokens_per_second\":12.0,\"time_to_first_token_seconds\":0.1},\"response_id\":\"resp_stream\"}}\n\n")
+    end
+
+    with_test_server(handler; stream=true) do port
+        client = Client(base_url="http://127.0.0.1:$(port)")
+        lines = collect(LMStudioClient._stream_request_lines(
+            client,
+            "POST",
+            "/api/v1/chat";
+            body=Dict(
+                "model" => "google/gemma-4-e2b",
+                "input" => "Say hello",
+                "stream" => true,
+            ),
+        ))
+
+        @test occursin("\"model\":\"google/gemma-4-e2b\"", request_body[])
+        @test occursin("\"input\":\"Say hello\"", request_body[])
+        @test lines[1] == "event: message.delta"
+        @test lines[2] == "data: {\"type\":\"message.delta\",\"content\":\"Hello\"}"
+        @test lines[end - 1] == "data: {\"type\":\"chat.end\",\"result\":{\"model_instance_id\":\"google/gemma-4-e2b\",\"output\":[],\"stats\":{\"input_tokens\":1,\"total_output_tokens\":1,\"reasoning_output_tokens\":0,\"tokens_per_second\":12.0,\"time_to_first_token_seconds\":0.1},\"response_id\":\"resp_stream\"}}"
+    end
+end
+
+@testset "stream transport preserves final unterminated SSE line at EOF" begin
+    handler = function (http::HTTP.Stream)
+        _ = String(read(http))
+        HTTP.setstatus(http, 200)
+        HTTP.setheader(http, "Content-Type" => "text/event-stream")
+        HTTP.setheader(http, "Cache-Control" => "no-cache")
+        HTTP.startwrite(http)
+        write(http, "event: message.delta\n")
+        write(http, "data: {\"type\":\"message.delta\",\"content\":\"Tail\"}")
+    end
+
+    with_test_server(handler; stream=true) do port
+        client = Client(base_url="http://127.0.0.1:$(port)")
+        events = collect(LMStudioClient._decode_sse_lines(LMStudioClient._stream_request_lines(
+            client,
+            "POST",
+            "/api/v1/chat";
+            body=Dict(
+                "model" => "google/gemma-4-e2b",
+                "input" => "Say hello",
+                "stream" => true,
+            ),
+        )))
+
+        @test length(events) == 1
+        @test events[1] isa MessageDeltaEvent
+        @test events[1].content == "Tail"
+    end
+end
+
 @testset "load chat and session APIs" begin
     calls = Any[]
     responses = [

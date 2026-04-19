@@ -1,0 +1,97 @@
+# LMStudioClient.jl
+
+Thin Julia client for LM Studio's native REST API.
+
+It supports:
+
+- model download
+- model load
+- non-streaming chat
+- stateful chat with `ChatSession`
+- streaming chat via `stream_chat`
+
+## Prerequisites
+
+- Julia 1.12+
+- A running LM Studio server
+- By default, `Client()` connects to `http://127.0.0.1:1234`
+
+## Installation
+
+Clone the repository first, then run Julia from the repository root:
+
+```bash
+git clone <your-repo-url>
+cd LMStudioClient
+```
+
+```julia
+using Pkg
+Pkg.develop(path=".")
+```
+
+If you are using this package from another Julia environment, add it there in the usual way.
+
+For a scratch environment outside the repo:
+
+```julia
+using Pkg
+Pkg.activate("lmstudio-scratch")
+Pkg.develop(path="/absolute/path/to/LMStudioClient")
+Pkg.instantiate()
+```
+
+## Quickstart
+
+```julia
+using LMStudioClient
+
+client = Client()
+
+job = download_model(client, "google/gemma-4-e2b")
+wait_for_download(client, job; timeout=1800)
+
+load_model(client, "google/gemma-4-e2b"; context_length=8192)
+
+response = chat(client; model="google/gemma-4-e2b", input="Reply with the single word BLUE.")
+
+for item in response.output
+    if item isa MessageOutput
+        println(item.content)
+    end
+end
+```
+
+## Streaming Chat
+
+```julia
+using LMStudioClient
+
+client = Client(
+    base_url=get(ENV, "LMSTUDIO_BASE_URL", "http://127.0.0.1:1234"),
+)
+
+# Replace the model name with one that exists in your LM Studio setup.
+model = get(ENV, "LMSTUDIO_MODEL", "google/gemma-4-e2b")
+
+for event in stream_chat(client; model=model, input="Say hello")
+    if event isa MessageDeltaEvent
+        print(event.content)
+    elseif event isa StreamErrorEvent
+        @warn "stream error" event.error
+    elseif event isa ChatEndEvent
+        println()
+    end
+end
+```
+
+The streamed text chunks arrive in `MessageDeltaEvent(content::String)`.
+
+## Building The Docs Locally
+
+```bash
+julia --project=docs -e 'using Pkg; Pkg.instantiate()'
+julia --project=docs docs/make.jl
+```
+
+Then open `docs/build/index.html`.

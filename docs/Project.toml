@@ -1,0 +1,9 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+LMStudioClient = "bd03a44f-7599-420b-a0ff-985714b58da8"
+
+[compat]
+Documenter = "1"
+
+[sources]
+LMStudioClient = { path = ".." }
