@@ -329,15 +329,17 @@ end
                 ),
                 Dict(
                     "type" => "embedding",
-                    "publisher" => "nomic",
+                    "publisher" => nothing,
                     "key" => "text-embedding-nomic-embed-text-v1.5",
-                    "display_name" => "Nomic Embed Text v1.5",
+                    "display_name" => nothing,
                     "quantization" => Dict("name" => "F16", "bits_per_weight" => 16),
                     "size_bytes" => 84000000,
                     "params_string" => nothing,
-                    "loaded_instances" => Any[],
+                    "loaded_instances" => nothing,
                     "max_context_length" => 2048,
                     "format" => "gguf",
+                    "capabilities" => nothing,
+                    "variants" => nothing,
                 ),
             ],
         )
@@ -353,6 +355,10 @@ end
     @test models[1].type == :llm
     @test models[1].key == "google/gemma-4-e2b"
     @test models[2].type == :embedding
+    @test models[2].publisher == ""
+    @test models[2].display_name == "text-embedding-nomic-embed-text-v1.5"
+    @test isempty(models[2].capabilities)
+    @test isempty(models[2].variants)
 
     llm_only = LMStudioClient.list_models(client; domain=:llm, _transport=fake_transport)
     @test length(llm_only) == 1

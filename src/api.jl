@@ -67,32 +67,50 @@ function _parse_download_job(data::AbstractDict{String,<:Any})
     )
 end
 
+_optional_string(value) = value === nothing ? nothing : String(value)
+_optional_string(value, default::String) = value === nothing ? default : String(value)
+
+function _optional_string_vector(value)
+    value === nothing && return String[]
+    return [String(item) for item in value]
+end
+
+_optional_string_dict(value) = value === nothing ? Dict{String,Any}() : Dict{String,Any}(value)
+
+function _optional_string_dict(value, default::Dict{String,Any})
+    value === nothing && return default
+    return Dict{String,Any}(value)
+end
+
 function _parse_model_info(data::AbstractDict{String,<:Any})
+    key = String(data["key"])
     ModelInfo(
         _parse_load_type(String(data["type"])),
-        String(get(data, "publisher", "")),
-        String(data["key"]),
-        String(get(data, "display_name", data["key"])),
-        isnothing(get(data, "architecture", nothing)) ? nothing : String(data["architecture"]),
+        _optional_string(get(data, "publisher", nothing), ""),
+        key,
+        _optional_string(get(data, "display_name", nothing), key),
+        _optional_string(get(data, "architecture", nothing)),
         isnothing(get(data, "quantization", nothing)) ? nothing : Dict{String,Any}(data["quantization"]),
         Int(get(data, "size_bytes", 0)),
-        isnothing(get(data, "params_string", nothing)) ? nothing : String(data["params_string"]),
+        _optional_string(get(data, "params_string", nothing)),
         Int(get(data, "max_context_length", 0)),
-        isnothing(get(data, "format", nothing)) ? nothing : String(data["format"]),
-        haskey(data, "capabilities") ? Dict{String,Any}(data["capabilities"]) : Dict{String,Any}(),
-        isnothing(get(data, "description", nothing)) ? nothing : String(data["description"]),
-        [String(item) for item in get(data, "variants", Any[])],
-        isnothing(get(data, "selected_variant", nothing)) ? nothing : String(data["selected_variant"]),
+        _optional_string(get(data, "format", nothing)),
+        _optional_string_dict(get(data, "capabilities", nothing)),
+        _optional_string(get(data, "description", nothing)),
+        _optional_string_vector(get(data, "variants", Any[])),
+        _optional_string(get(data, "selected_variant", nothing)),
         Dict{String,Any}(data),
     )
 end
 
 function _parse_loaded_model_infos(model_data::AbstractDict{String,<:Any})
     model_type = _parse_load_type(String(model_data["type"]))
-    publisher = String(get(model_data, "publisher", ""))
     model_key = String(model_data["key"])
-    display_name = String(get(model_data, "display_name", model_key))
-    architecture = isnothing(get(model_data, "architecture", nothing)) ? nothing : String(model_data["architecture"])
+    publisher = _optional_string(get(model_data, "publisher", nothing), "")
+    display_name = _optional_string(get(model_data, "display_name", nothing), model_key)
+    architecture = _optional_string(get(model_data, "architecture", nothing))
+    loaded_instances = get(model_data, "loaded_instances", Any[])
+    loaded_instances === nothing && return LoadedModelInfo[]
 
     return LoadedModelInfo[
         LoadedModelInfo(
@@ -110,7 +128,7 @@ function _parse_loaded_model_infos(model_data::AbstractDict{String,<:Any})
             haskey(instance["config"], "offload_kv_cache_to_gpu") ? Bool(instance["config"]["offload_kv_cache_to_gpu"]) : nothing,
             Dict{String,Any}(instance),
         )
-        for instance in get(model_data, "loaded_instances", Any[])
+        for instance in loaded_instances
     ]
 end
 
