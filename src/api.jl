@@ -316,7 +316,8 @@ function _parse_chat_response(data::AbstractDict{String,<:Any})
         haskey(stats_data, "model_load_time_seconds") ? _safe_float(stats_data["model_load_time_seconds"]) : nothing,
     )
     output = ChatOutputItem[_parse_output_item(item) for item in get(data, "output", Any[])]
-    return ChatResponse(String(get(data, "model_instance_id", "unknown")), output, stats, get(data, "response_id", nothing))
+    model_instance_id = _optional_string(get(data, "model_instance_id", nothing), "unknown")
+    return ChatResponse(model_instance_id, output, stats, get(data, "response_id", nothing))
 end
 
 function chat(client::Client; model::String, input, system_prompt::Union{Nothing,String}=nothing, previous_response_id::Union{Nothing,String}=nothing, store::Bool=true, temperature=nothing, top_p=nothing, top_k=nothing, min_p=nothing, repeat_penalty=nothing, max_output_tokens=nothing, reasoning=nothing, context_length=nothing, _transport=_request_adapter)
@@ -355,7 +356,9 @@ function chat(client::Client, session::ChatSession, input; kwargs...)
         system_prompt=session.system_prompt,
         kwargs...,
     )
-    session.previous_response_id = response.response_id
+    if !isnothing(response.response_id)
+        session.previous_response_id = response.response_id
+    end
     return response
 end
 
@@ -398,7 +401,9 @@ function stream_chat(client::Client, session::ChatSession, input; kwargs...)
     return _error_aware_channel(LMStudioEvent, _SESSION_STREAM_BUFFER_SIZE) do channel
         for event in upstream
             if event isa ChatEndEvent
-                session.previous_response_id = event.result.response_id
+                if !isnothing(event.result.response_id)
+                    session.previous_response_id = event.result.response_id
+                end
             end
             put!(channel, event)
         end

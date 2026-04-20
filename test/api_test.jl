@@ -283,6 +283,52 @@ end
     @test embedding_loaded.load_config["context_length"] == 2048
 end
 
+@testset "chat response parsing tolerates missing ids and preserves session state" begin
+    parsed = LMStudioClient._parse_chat_response(Dict(
+        "model_instance_id" => nothing,
+        "output" => Any[],
+        "stats" => Dict(
+            "input_tokens" => 2,
+            "total_output_tokens" => 0,
+            "reasoning_output_tokens" => 0,
+            "tokens_per_second" => 0.0,
+            "time_to_first_token_seconds" => 0.1,
+        ),
+        "response_id" => nothing,
+    ))
+
+    @test parsed.model_instance_id == "unknown"
+    @test isempty(parsed.output)
+    @test isnothing(parsed.response_id)
+
+    fake_transport = function (; method, path, body, stream, client)
+        @test method == "POST"
+        @test path == "/api/v1/chat"
+        @test body["model"] == "google/gemma-4-e2b"
+        @test body["previous_response_id"] == "resp_existing"
+        return Dict(
+            "model_instance_id" => nothing,
+            "output" => Any[],
+            "stats" => Dict(
+                "input_tokens" => 2,
+                "total_output_tokens" => 0,
+                "reasoning_output_tokens" => 0,
+                "tokens_per_second" => 0.0,
+                "time_to_first_token_seconds" => 0.1,
+            ),
+            "response_id" => nothing,
+        )
+    end
+
+    client = Client()
+    session = ChatSession("google/gemma-4-e2b"; previous_response_id="resp_existing")
+    reply = LMStudioClient.chat(client, session, "Continue."; _transport=fake_transport)
+
+    @test reply.model_instance_id == "unknown"
+    @test isnothing(reply.response_id)
+    @test session.previous_response_id == "resp_existing"
+end
+
 @testset "model listing APIs" begin
     captured = Ref{Any}(nothing)
     fake_transport = function (; method, path, body=nothing, stream, client)
@@ -520,7 +566,7 @@ end
     session = ChatSession("google/gemma-4-e2b"; previous_response_id="resp_stale")
     reply = LMStudioClient.chat(client, session, "Continue"; _transport=no_id_transport)
     @test isnothing(reply.response_id)
-    @test isnothing(session.previous_response_id)
+    @test session.previous_response_id == "resp_stale"
 
     called = Ref(false)
     no_call_transport = function (; method, path, body, stream, client)

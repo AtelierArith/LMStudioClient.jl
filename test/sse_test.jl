@@ -43,6 +43,22 @@ end
     @test events[1].content == "Goodbye"
 end
 
+@testset "SSE parser tolerates chat.end without result payload" begin
+    raw = [
+        "event: chat.end",
+        "data: {\"type\":\"chat.end\"}",
+        "",
+    ]
+
+    events = collect(LMStudioClient._decode_sse_lines(raw))
+
+    @test length(events) == 1
+    @test events[1] isa ChatEndEvent
+    @test events[1].result.model_instance_id == "unknown"
+    @test isempty(events[1].result.output)
+    @test isnothing(events[1].result.response_id)
+end
+
 @testset "stream_chat delivers incrementally from a producer channel" begin
     release = Channel{Nothing}(1)
     fake_stream_transport = function (; method, path, body, stream, client)
@@ -226,6 +242,35 @@ end
 
     rest = collect(events)
     @test any(event -> event isa ChatEndEvent, rest)
+end
+
+@testset "stream_chat session preserves previous_response_id when chat.end lacks response_id" begin
+    raw_lines = [
+        "event: chat.start",
+        "data: {\"type\":\"chat.start\",\"model_instance_id\":\"google/gemma-4-e2b\"}",
+        "",
+        "event: chat.end",
+        "data: {\"type\":\"chat.end\",\"result\":{\"model_instance_id\":null,\"output\":[],\"stats\":{\"input_tokens\":1,\"total_output_tokens\":0,\"reasoning_output_tokens\":0,\"tokens_per_second\":0.0,\"time_to_first_token_seconds\":0.1},\"response_id\":null}}",
+        "",
+    ]
+
+    fake_stream_transport = function (; method, path, body, stream, client)
+        @test method == "POST"
+        @test path == "/api/v1/chat"
+        @test stream == true
+        @test body["stream"] == true
+        return raw_lines
+    end
+
+    client = Client()
+    session = ChatSession("google/gemma-4-e2b"; previous_response_id="resp_existing")
+    events = collect(stream_chat(client, session, "Continue."; _stream_transport=fake_stream_transport))
+
+    @test length(events) == 2
+    @test events[end] isa ChatEndEvent
+    @test events[end].result.model_instance_id == "unknown"
+    @test isnothing(events[end].result.response_id)
+    @test session.previous_response_id == "resp_existing"
 end
 
 @testset "stream_chat session overload applies backpressure instead of buffering unbounded events" begin

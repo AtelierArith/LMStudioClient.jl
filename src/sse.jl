@@ -53,7 +53,7 @@ function _decode_event(event_name::AbstractString, payload::AbstractDict{String,
     elseif event_name == "error"
         return StreamErrorEvent(Dict{String,Any}(get(payload, "error", Dict{String,Any}())))
     elseif event_name == "chat.end"
-        return ChatEndEvent(_parse_chat_response(payload["result"]))
+        return ChatEndEvent(_parse_chat_response(get(payload, "result", Dict{String,Any}())))
     else
         return UnknownEvent(String(event_name), Dict{String,Any}(payload))
     end
