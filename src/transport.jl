@@ -1,17 +1,67 @@
 using HTTP
 using JSON3
 
-struct _ErrorAwareChannel{T} <: Base.AbstractChannel{T}
+struct _ErrorAwareChannel{T,F} <: Base.AbstractChannel{T}
     channel::Channel{T}
     failure::Base.RefValue{Any}
+    cancelled::Base.RefValue{Bool}
+    producer_task::Task
+    on_close::F
 end
 
 Base.IteratorEltype(::Type{<:_ErrorAwareChannel}) = Base.HasEltype()
 Base.IteratorSize(::Type{<:_ErrorAwareChannel}) = Base.SizeUnknown()
 Base.eltype(::Type{_ErrorAwareChannel{T}}) where {T} = T
 Base.isopen(stream::_ErrorAwareChannel) = isopen(stream.channel)
-Base.close(stream::_ErrorAwareChannel) = close(stream.channel)
-Base.wait(stream::_ErrorAwareChannel) = wait(stream.channel)
+
+function _cancel_task(task::Task)
+    istaskdone(task) && return nothing
+    current_task() === task && return nothing
+    @async begin
+        try
+            Base.throwto(task, InterruptException())
+        catch err
+            if !(err isa InterruptException || err isa InvalidStateException || err isa TaskFailedException)
+                return nothing
+            end
+        end
+    end
+    return nothing
+end
+
+function _maybe_close(stream)
+    applicable(close, stream) || return nothing
+    try
+        close(stream)
+    catch err
+        if !(err isa InvalidStateException)
+            throw(_root_task_failure(err))
+        end
+    end
+    return nothing
+end
+
+function Base.close(stream::_ErrorAwareChannel)
+    stream.cancelled[] = true
+    isopen(stream.channel) && close(stream.channel)
+    stream.on_close()
+    _cancel_task(stream.producer_task)
+    return nothing
+end
+
+function Base.wait(stream::_ErrorAwareChannel)
+    try
+        wait(stream.channel)
+    catch err
+        if err isa InvalidStateException
+            _throw_stream_failure(stream)
+            return nothing
+        end
+        throw(_root_task_failure(err))
+    end
+    _throw_stream_failure(stream)
+    return nothing
+end
 
 function _root_task_failure(err)
     current = err
@@ -37,6 +87,8 @@ function _throw_stream_failure(stream::_ErrorAwareChannel)
     isnothing(stream.failure[]) && return nothing
     throw(_root_task_failure(stream.failure[]))
 end
+
+_is_cancelled_close(err, cancelled::Bool) = cancelled && (err isa InterruptException || err isa InvalidStateException)
 
 function Base.iterate(stream::_ErrorAwareChannel)
     try
@@ -75,25 +127,28 @@ function Base.take!(stream::_ErrorAwareChannel)
     end
 end
 
-function _error_aware_channel(producer::Function, ::Type{T}, size::Integer) where {T}
+function _error_aware_channel(producer::Function, ::Type{T}, size::Integer; on_close=()->nothing) where {T}
     channel = Channel{T}(size)
     failure = Ref{Any}(nothing)
+    cancelled = Ref(false)
 
-    @async begin
+    task = @async begin
         try
             producer(channel)
         catch err
-            failure[] = err
+            if !_is_cancelled_close(err, cancelled[])
+                failure[] = err
+            end
         finally
-            close(channel)
+            isopen(channel) && close(channel)
         end
     end
 
-    return _ErrorAwareChannel{T}(channel, failure)
+    return _ErrorAwareChannel{T,typeof(on_close)}(channel, failure, cancelled, task, on_close)
 end
 
-function _error_aware_channel(::Type{T}, size::Integer, producer::Function) where {T}
-    return _error_aware_channel(producer, T, size)
+function _error_aware_channel(::Type{T}, size::Integer, producer::Function; on_close=()->nothing) where {T}
+    return _error_aware_channel(producer, T, size; on_close=on_close)
 end
 
 function _maybe_api_error(body::AbstractString)

@@ -516,6 +516,15 @@ end
     @test paused_job.status == :completed
     @test paused_polls[] == 2
 
+    missing_id_job = DownloadJob(nothing, :downloading, nothing, nothing, nothing, nothing, nothing, nothing)
+    @test_throws LMStudioClient.LMStudioProtocolError LMStudioClient.wait_for_download(
+        client,
+        missing_id_job;
+        poll_interval=0.0,
+        timeout=0.05,
+        _transport=paused_transport,
+    )
+
     bad_type_transport = function (; method, path, body, stream, client)
         return Dict(
             "type" => "mystery",

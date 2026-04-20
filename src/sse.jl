@@ -60,7 +60,7 @@ function _decode_event(event_name::AbstractString, payload::AbstractDict{String,
 end
 
 function _decode_sse_lines(lines)
-    return _error_aware_channel(LMStudioEvent, 32) do channel
+    return _error_aware_channel(LMStudioEvent, 32; on_close=() -> _maybe_close(lines)) do channel
         event_name = nothing
         data_lines = String[]
         flush_event!() = if !isnothing(event_name)

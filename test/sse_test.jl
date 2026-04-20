@@ -314,6 +314,41 @@ end
     close(events)
 end
 
+@testset "stream_chat close propagates upstream cancellation" begin
+    upstream_finished = Ref(false)
+
+    fake_stream_transport = function (; method, path, body, stream, client)
+        @test method == "POST"
+        @test path == "/api/v1/chat"
+        @test stream == true
+        @test body["stream"] == true
+        return Channel{String}(0) do channel
+            try
+                put!(channel, "event: chat.start")
+                put!(channel, "data: {\"type\":\"chat.start\",\"model_instance_id\":\"google/gemma-4-e2b\"}")
+                put!(channel, "")
+
+                for idx in 1:200
+                    put!(channel, "event: message.delta")
+                    put!(channel, "data: {\"type\":\"message.delta\",\"content\":\"chunk $(idx)\"}")
+                    put!(channel, "")
+                end
+            finally
+                upstream_finished[] = true
+            end
+        end
+    end
+
+    client = Client()
+    events = stream_chat(client; model="google/gemma-4-e2b", input="Keep going.", _stream_transport=fake_stream_transport)
+
+    first_event = take!(events)
+    @test first_event isa ChatStartEvent
+
+    close(events)
+    @test wait_until(() -> upstream_finished[]; timeout=0.5)
+end
+
 @testset "stream_chat surfaces producer API errors directly" begin
     fake_stream_transport = function (; method, path, body, stream, client)
         @test method == "POST"
@@ -357,6 +392,41 @@ end
     catch err
         err
     end
+    @test err isa LMStudioClient.LMStudioAPIError
+    @test err.error_type == "invalid_request"
+    @test err.code == "model_not_found"
+end
+
+@testset "wait(stream_chat(...)) surfaces producer failures" begin
+    fake_stream_transport = function (; method, path, body, stream, client)
+        @test method == "POST"
+        @test path == "/api/v1/chat"
+        @test stream == true
+        @test body["stream"] == true
+        return LMStudioClient._error_aware_channel(String, 8) do channel
+            put!(channel, "event: message.delta")
+            put!(channel, "data: {\"type\":\"message.delta\",\"content\":\"hello\"}")
+            put!(channel, "")
+            request = HTTP.Request("POST", "http://127.0.0.1:1234/api/v1/chat")
+            api_error = LMStudioClient.LMStudioAPIError("invalid_request", "Invalid model identifier", "model_not_found", "model")
+            throw(HTTP.Exceptions.RequestError(request, api_error))
+        end
+    end
+
+    client = Client()
+    events = stream_chat(client; model="definitely/not-a-real-model", input="Say hello.", _stream_transport=fake_stream_transport)
+
+    first_event = take!(events)
+    @test first_event isa MessageDeltaEvent
+    @test first_event.content == "hello"
+
+    err = try
+        wait(events)
+        nothing
+    catch err
+        err
+    end
+
     @test err isa LMStudioClient.LMStudioAPIError
     @test err.error_type == "invalid_request"
     @test err.code == "model_not_found"

@@ -202,7 +202,14 @@ function wait_for_download(client::Client, job_or_job_id; poll_interval::Real=1.
 
         sleep_for = isnothing(deadline) ? poll_interval : min(poll_interval, deadline - now)
         sleep(sleep_for)
-        job = download_status(client, something(job.job_id, String(job_or_job_id)); _transport=_transport)
+        poll_job_id = if !isnothing(job.job_id)
+            job.job_id
+        elseif job_or_job_id isa DownloadJob
+            throw(LMStudioProtocolError("download job missing job_id for non-terminal status: $(job.status)"))
+        else
+            String(job_or_job_id)
+        end
+        job = download_status(client, poll_job_id; _transport=_transport)
         if !isnothing(deadline) && time() >= deadline
             throw(LMStudioTimeoutError("Timed out waiting for download to complete"))
         end
@@ -398,7 +405,7 @@ function stream_chat(client::Client, session::ChatSession, input; kwargs...)
         system_prompt=session.system_prompt,
         kwargs...,
     )
-    return _error_aware_channel(LMStudioEvent, _SESSION_STREAM_BUFFER_SIZE) do channel
+    return _error_aware_channel(LMStudioEvent, _SESSION_STREAM_BUFFER_SIZE; on_close=() -> _maybe_close(upstream)) do channel
         for event in upstream
             if event isa ChatEndEvent
                 if !isnothing(event.result.response_id)
